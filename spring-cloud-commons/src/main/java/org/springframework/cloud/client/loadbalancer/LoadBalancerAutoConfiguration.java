@@ -48,13 +48,27 @@ import org.springframework.web.client.RestTemplate;
 @EnableConfigurationProperties(LoadBalancerRetryProperties.class)
 public class LoadBalancerAutoConfiguration {
 
+	/**
+	 * 1.@AutoWired也会自动装载集合类list，会将合适的RestTemplate添加到restTemplates中
+	 * 而至于加载哪些RestTemplate，就是标注了@LoadBalanced的RestTemplate
+	 * 上面我们看到@LoadBalanced有一个@Qualifier就是特殊标注的含义，所以普通的没有添加@LoadBalanced
+	 * 则不会被添加到restTemplates中的
+	 */
 	@LoadBalanced
 	@Autowired(required = false)
 	private List<RestTemplate> restTemplates = Collections.emptyList();
 
+	/**
+	 * 负载均衡器请求变压器
+	 */
 	@Autowired(required = false)
 	private List<LoadBalancerRequestTransformer> transformers = Collections.emptyList();
 
+	/**
+	 * 2.SmartInitializingSingleton接口的实现类会在项目初始化之后被调用其afterSingletonsInstantiated方法
+	 * @param restTemplateCustomizers
+	 * @return
+	 */
 	@Bean
 	public SmartInitializingSingleton loadBalancedRestTemplateInitializerDeprecated(
 			final ObjectProvider<List<RestTemplateCustomizer>> restTemplateCustomizers) {
@@ -67,6 +81,11 @@ public class LoadBalancerAutoConfiguration {
 		});
 	}
 
+	/**
+	 * 3.LoadBalancerRequestFactory被创建
+	 * @param loadBalancerClient
+	 * @return
+	 */
 	@Bean
 	@ConditionalOnMissingBean
 	public LoadBalancerRequestFactory loadBalancerRequestFactory(
@@ -78,6 +97,13 @@ public class LoadBalancerAutoConfiguration {
 	@ConditionalOnMissingClass("org.springframework.retry.support.RetryTemplate")
 	static class LoadBalancerInterceptorConfig {
 
+		/**
+		 * 4.将LoadBalancerClient接口的实现类和3方法中创建的LoadBalancerRequestFactory
+		 * 注入到该方法中，同时成为LoadBalancerInterceptor的参数
+		 * @param loadBalancerClient
+		 * @param requestFactory
+		 * @return
+		 */
 		@Bean
 		public LoadBalancerInterceptor loadBalancerInterceptor(
 				LoadBalancerClient loadBalancerClient,
@@ -85,10 +111,16 @@ public class LoadBalancerAutoConfiguration {
 			return new LoadBalancerInterceptor(loadBalancerClient, requestFactory);
 		}
 
+		/**
+		 * 5. 方法4中创建的LoadBalancerInterceptor会被作为方法参数注入进来
+		 * @param loadBalancerInterceptor
+		 * @return
+		 */
 		@Bean
 		@ConditionalOnMissingBean
 		public RestTemplateCustomizer restTemplateCustomizer(
 				final LoadBalancerInterceptor loadBalancerInterceptor) {
+			// 5.1 customize方法会被2方法中的afterSingletonsInstantiated()遍历调用
 			return restTemplate -> {
 				List<ClientHttpRequestInterceptor> list = new ArrayList<>(
 						restTemplate.getInterceptors());
@@ -101,6 +133,7 @@ public class LoadBalancerAutoConfiguration {
 
 	/**
 	 * Auto configuration for retry mechanism.
+	 * 有关于RetryTemplate相关的bean在该例中不会被加载进来
 	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(RetryTemplate.class)

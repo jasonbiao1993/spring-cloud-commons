@@ -48,6 +48,8 @@ public class LoadBalancerInterceptor implements ClientHttpRequestInterceptor {
 		this(loadBalancer, new LoadBalancerRequestFactory(loadBalancer));
 	}
 
+
+
 	@Override
 	public ClientHttpResponse intercept(final HttpRequest request, final byte[] body,
 			final ClientHttpRequestExecution execution) throws IOException {
